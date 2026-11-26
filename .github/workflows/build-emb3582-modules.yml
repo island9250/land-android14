@@ -62,10 +62,15 @@ jobs:
           git clone https://github.com/kelebek333/rtl8188fu.git rtl8188fu
           cd rtl8188fu
           git checkout cefa9185df3e56d7208a8c147d0cf57b2440908f
-          make -C ../ksrc M=$PWD ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CONFIG_PLATFORM_I386_PC=n CONFIG_MP_INCLUDED=n \
+          # the x86/arm platform branches inject -mhard-float / -mfloat-abi=hard,
+          # neither is valid for aarch64; the endian/cfg80211 flags we need come
+          # from the (default) CONFIG_PLATFORM_I386_PC branch.
+          sed -i -e 's/^EXTRA_CFLAGS += -mhard-float$/EXTRA_CFLAGS +=/' \
+                 -e 's/^EXTRA_CFLAGS += -mfloat-abi=hard$/EXTRA_CFLAGS +=/' Makefile
+          grep -n 'EXTRA_CFLAGS += -m' Makefile || true
+          make KSRC=$PWD/../ksrc ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
             KBUILD_MODPOST_WARN=1 modules
-          cp 8188fu.ko ../out/
+          cp rtl8188fu.ko ../out/
 
       - name: inject __versions when missing
         run: |
