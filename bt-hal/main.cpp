@@ -7,9 +7,17 @@
 // events are forwarded verbatim, with the one-byte HCI packet type added on
 // write and stripped on read.
 
-#include <android/binder_manager.h>
-#include <android/binder_process.h>
+#include <android/binder_ibinder.h>
+#include <android/binder_status.h>
 #include <android/log.h>
+
+// The NDK does not export <android/binder_manager.h> / <android/binder_process.h>
+// in every release; the C ABI below is stable (libbinder_ndk LLNDK).
+extern "C" {
+binder_status_t AServiceManager_addService(AIBinder* binder, const char* instance);
+void ABinderProcess_setThreadPoolMaxThreadCount(uint32_t num_threads);
+void ABinderProcess_joinThreadPool();
+}
 
 #include <dirent.h>
 #include <fcntl.h>

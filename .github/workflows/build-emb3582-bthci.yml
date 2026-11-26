@@ -54,7 +54,7 @@ jobs:
           SRCS="bt-hal/main.cpp $(find gen -name '*.cpp' | tr '\n' ' ')"
           "$TOOL/aarch64-linux-android30-clang++" -std=c++17 -O2 -fPIE -pie \
             -static-libstdc++ -Wall -Wno-unused-parameter \
-            -I gen -I bt-hal/aidl $SRCS \
+            -I gen -I gen/aidl -I bt-hal/aidl $SRCS \
             -o android.hardware.bluetooth-service.emb3582 \
             -lbinder_ndk -llog
           "$TOOL/llvm-strip" --strip-unneeded android.hardware.bluetooth-service.emb3582
