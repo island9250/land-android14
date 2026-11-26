@@ -1,0 +1,41 @@
+name: bake-emb3582-ext4
+
+# Offline ext4 edits for the EMB-3582 super slices using e2fsprogs debugfs.
+# The bundle (vendor.img / vendor_dlkm.img / product.img + payload + edit
+# script) is attached to the "bake-bundle-v1" release of this repository.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: fetch bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh release download bake-bundle-v1 -R "$GITHUB_REPOSITORY" -p 'bake_bundle.tar.gz' -O bundle.tar.gz
+          ls -l bundle.tar.gz
+          tar xzf bundle.tar.gz
+          ls -l
+
+      - name: deps
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends e2fsprogs
+
+      - name: edit slices
+        run: bash edit_ext4.sh 2>&1 | tee edit.log
+
+      - name: pack results
+        run: |
+          set -e
+          tar czf results.tar.gz vendor.img vendor_dlkm.img product.img edit.log
+          ls -l results.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baked-slices
+          path: results.tar.gz
+          if-no-files-found: error
