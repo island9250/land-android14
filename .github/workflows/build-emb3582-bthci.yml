@@ -40,7 +40,7 @@ jobs:
         run: |
           set -e
           mkdir -p gen
-          "$AIDL" --lang=ndk --stability=vintf -I bt-hal/aidl -o gen \
+          "$AIDL" --lang=ndk --stability=vintf -I bt-hal/aidl -o gen -h gen \
             bt-hal/aidl/android/hardware/bluetooth/IBluetoothHci.aidl \
             bt-hal/aidl/android/hardware/bluetooth/IBluetoothHciCallbacks.aidl \
             bt-hal/aidl/android/hardware/bluetooth/Status.aidl
