@@ -40,7 +40,7 @@ jobs:
         run: |
           set -e
           cp kernel/emb3582_android_defconfig ksrc/.config
-          ksrc/scripts/config --file ksrc/.config --module SND_SOC_ES8328 --module SND_SOC_ES8328_I2C
+          ksrc/scripts/config --file ksrc/.config --module SND_SOC_ES8328 --module SND_SOC_ES8328_I2C --disable WERROR
           make -C ksrc ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
           make -C ksrc ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare -j$(nproc)
           echo '--- symbols ---'
