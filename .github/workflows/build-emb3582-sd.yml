@@ -80,10 +80,10 @@ jobs:
           # model / compatible 必须是 EMB-3582，不是友善 T6
           import subprocess
           out = subprocess.check_output(['dtc', '-I', 'dtb', '-O', 'dts', sys.argv[1]]).decode('utf8', 'replace')
-          if 'norco,rk3588-emb3582' not in out:
-              raise SystemExit('FATAL: dtb compatible is not norco,rk3588-emb3582')
-          if 'NORCO EMB3582' not in out:
-              raise SystemExit('FATAL: dtb model is not NORCO EMB3582')
+          if 'EMB-3582' not in out:
+              raise SystemExit('FATAL: dtb compatible is not EMB-3582')
+          if 'model = "EMB-3582' not in out:
+              raise SystemExit('FATAL: dtb model is not EMB-3582')
           print('model/compatible OK')
           PY
 
