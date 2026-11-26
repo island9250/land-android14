@@ -1,0 +1,172 @@
+name: build-emb3582-sd
+
+# NORCO EMB-3582-V11 (RK3588) Android 14 SD 卡镜像
+#
+# 底包：友善 android-14-images-20251222.tgz（NanoPC-T6 / RK3588）
+# 改动：只把 boot.img 里 12 个 rk3588-nanopi6-rev*.dtb 槽全部换成 EMB-3582 的
+#       Android 化 dtb；uboot/分区布局保持友善原样。
+# 产物：emb3582-a14-sd-8g.img.xz，写 SD 卡整盘启动，不碰 eMMC/NVMe。
+#
+# 和 H88K 的 build-h88k-usb.yml 共用同一套 dtb/cpp/pack_boot/make_sd_image 工具；
+# 区别是不打 USB 线刷包，直接出 SD 整盘镜像。
+
+on:
+  workflow_dispatch:
+    inputs:
+      src_url:
+        description: FriendlyElec Android 14 partition bundle
+        required: false
+        default: https://downloads.friendlyelec.com/os-images/rk3588/images/android-14-images-20251222.tgz
+      size_gb:
+        description: SD image size in GiB (>=8)
+        required: false
+        default: "8"
+  push:
+    branches:
+      - emb3582
+    paths:
+      - dts/rk3588-emb3582-android.dts
+      - .github/workflows/build-emb3582-sd.yml
+
+permissions:
+  contents: read
+
+env:
+  TREE: vendor/dts-tree
+  RK: vendor/dts-tree/arch/arm64/boot/dts/rockchip
+  DTB: out/rk3588-emb3582.dtb
+  BOOT: build/boot-emb3582.img
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc device-tree-compiler python3 xz-utils
+          cpp --version | head -1
+          dtc --version
+          df -h /
+
+      - name: Build EMB3582 dtb (cpp + dtc)
+        run: |
+          set -euo pipefail
+          test -f "$RK/rk3588.dtsi" || { echo "FATAL: missing rk3588.dtsi"; exit 1; }
+          test -f "$RK/rk3588-android.dtsi" || { echo "FATAL: missing rk3588-android.dtsi"; exit 1; }
+          test -f "$TREE/include/dt-bindings/display/rockchip_vop.h" || { echo "FATAL: missing rockchip_vop.h"; exit 1; }
+          cpp -nostdinc -I"$TREE/include" -I"$RK" \
+              -undef -D__DTS__ -x assembler-with-cpp \
+              dts/rk3588-emb3582-android.dts -o /tmp/emb.pre.dts
+          mkdir -p out build
+          dtc -@ -I dts -O dtb -o "$DTB" /tmp/emb.pre.dts 2>/tmp/dtc.log || {
+            echo "===== DTC FAILED ====="; tail -80 /tmp/dtc.log; exit 1; }
+          echo "===== dtc warnings (first 30) ====="
+          grep -E "^(Warning|ERROR)" /tmp/dtc.log | head -30 || true
+          echo "warning count: $(grep -cE '^Warning' /tmp/dtc.log || true)"
+          sz=$(stat -c %s "$DTB")
+          echo "dtb size=$sz"
+          [ "$sz" -gt 120000 ] || { echo "FATAL: dtb too small ($sz B)"; exit 1; }
+          python3 - "$DTB" <<'PY'
+          import struct, sys
+          d = open(sys.argv[1], 'rb').read()
+          magic, tot = struct.unpack('>II', d[:8])
+          assert magic == 0xd00dfeed, hex(magic)
+          assert tot == len(d), (tot, len(d))
+          print('FDT magic OK, totalsize=%d, file=%d' % (tot, len(d)))
+          # model / compatible 必须是 EMB-3582，不是友善 T6
+          import subprocess
+          out = subprocess.check_output(['dtc', '-I', 'dtb', '-O', 'dts', sys.argv[1]]).decode('utf8', 'replace')
+          if 'norco,rk3588-emb3582' not in out:
+              raise SystemExit('FATAL: dtb compatible is not norco,rk3588-emb3582')
+          if 'NORCO EMB3582' not in out:
+              raise SystemExit('FATAL: dtb model is not NORCO EMB3582')
+          print('model/compatible OK')
+          PY
+
+      - name: Download FriendlyElec Android 14 base
+        run: |
+          set -euxo pipefail
+          URL="${{ github.event.inputs.src_url || 'https://downloads.friendlyelec.com/os-images/rk3588/images/android-14-images-20251222.tgz' }}"
+          for i in 1 2 3 4 5; do
+            curl -L --fail --connect-timeout 20 --max-time 3600 \
+                 --retry 5 --retry-delay 10 --retry-all-errors \
+                 -o images.tgz "$URL" && break
+            echo "retry $i"; sleep 15
+          done
+          ls -lh images.tgz
+          sha256sum images.tgz
+          mkdir -p parts
+          tar -xzf images.tgz -C parts
+          find parts -maxdepth 3 -type f -printf '%10s %p\n' | sort -k2 | head -40
+          P=$(find parts -name parameter.txt -type f | head -1)
+          [ -n "$P" ] || { echo "FATAL: parameter.txt not found in bundle"; exit 1; }
+          D=$(dirname "$P")
+          echo "PARAM_DIR=$D" >> "$GITHUB_ENV"
+          B=$(find "$D" -name boot.img -type f | head -1)
+          [ -n "$B" ] || { echo "FATAL: boot.img not found next to parameter.txt"; exit 1; }
+          echo "BOOT_STOCK=$B" >> "$GITHUB_ENV"
+          echo "base partition dir: $D"
+
+      - name: Inject EMB3582 dtb into boot.img (12 slots)
+        run: |
+          set -euxo pipefail
+          cp "$BOOT_STOCK" build/boot-stock.img
+          python3 tools/pack_boot.py --stock build/boot-stock.img \
+              --dtb "$DTB" \
+              -o "$BOOT" | tee /tmp/pack.txt
+          grep -q '12 slot(s)' /tmp/pack.txt || { echo "FATAL: dtb did not fill 12 slots"; exit 1; }
+          grep -q 'MATCH' /tmp/pack.txt || { echo "FATAL: boot header SHA1 not recomputed"; exit 1; }
+          python3 - <<'PY'
+          d = open('build/boot-emb3582.img', 'rb').read()
+          b = open('out/rk3588-emb3582.dtb', 'rb').read()
+          n = d.count(b)
+          print('dtb occurrences in boot.img: %d (expected 12)' % n)
+          assert n == 12, 'FATAL: expected 12 dtb slots, got %d' % n
+          PY
+
+      - name: Build SD card image
+        run: |
+          set -euxo pipefail
+          SIZE="${{ github.event.inputs.size_gb || '8' }}"
+          python3 tools/make_sd_image.py --size-gb "$SIZE" \
+              --boot "$BOOT" \
+              --param "$PARAM_DIR/parameter.txt" \
+              --img-dir "$PARAM_DIR" \
+              -o "out/emb3582-a14-sd-${SIZE}g.img" | tee /tmp/sd.txt
+          ls -lh out
+          sha256sum out/emb3582-a14-sd-*.img | tee out/SHA256SUMS.txt
+
+      - name: Compress and checksum
+        run: |
+          set -euxo pipefail
+          xz -T0 -9 -k out/emb3582-a14-sd-*.img
+          ls -lh out
+          sha256sum out/*.img out/*.img.xz > out/SHA256SUMS.txt
+          cat out/SHA256SUMS.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: emb3582-a14-sd
+          path: |
+            out/emb3582-a14-sd-*.img.xz
+            out/SHA256SUMS.txt
+            out/rk3588-emb3582.dtb
+            build/boot-emb3582.img
+          retention-days: 14
+
+      - name: Summary
+        run: |
+          {
+            echo "## EMB-3582 Android 14 SD image"
+            echo '```'
+            cat out/SHA256SUMS.txt
+            echo '```'
+            echo "- dtb: $(stat -c %s out/rk3588-emb3582.dtb) B"
+            echo "- boot: $(stat -c %s build/boot-emb3582.img) B"
+            echo "- SD: $(stat -c %s out/emb3582-a14-sd-*.img) B"
+          } >> "$GITHUB_STEP_SUMMARY"
