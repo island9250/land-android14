@@ -34,6 +34,7 @@ void ABinderProcess_joinThreadPool();
 #include <thread>
 #include <vector>
 
+#include "android/hardware/bluetooth/BnBluetoothHci.h"
 #include "android/hardware/bluetooth/IBluetoothHci.h"
 #include "android/hardware/bluetooth/IBluetoothHciCallbacks.h"
 #include "android/hardware/bluetooth/Status.h"
