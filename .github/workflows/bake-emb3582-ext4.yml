@@ -6,6 +6,10 @@ name: bake-emb3582-ext4
 
 on:
   workflow_dispatch:
+  push:
+    branches: [emb3582]
+    paths:
+      - '.github/workflows/bake-emb3582-ext4.yml'
 
 jobs:
   bake:
