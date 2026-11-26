@@ -1,0 +1,92 @@
+name: build-emb3582-modules
+
+# Builds the three out-of-image kernel modules the EMB3582 Android image lacks:
+#   - rtl8188fu  : USB wifi (RTL8188FTV dongle)
+#   - es8328-i2c : ES8388 analog audio codec (rockchip-es8388 sound card)
+#   - r8168      : second (PCIe) RTL8168 ethernet port
+#
+# The device kernel has CONFIG_MODVERSIONS=y but the exact Module.symvers is
+# unavailable, so modules are built against the public 6.1.141 source with the
+# device's own .config and a dummy __versions entry is injected when modpost
+# produced none. The loader then only warns about missing symbol versions and
+# ignores the version prefix in vermagic (same_magic(), has_crcs=true).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [emb3582]
+    paths:
+      - '.github/workflows/build-emb3582-modules.yml'
+      - 'kernel/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential gcc-aarch64-linux-gnu flex bison bc \
+            libssl-dev libelf-dev rsync cpio python3
+
+      - name: kernel source
+        run: git clone --depth 1 --branch nanopi6-v6.1.y https://github.com/friendlyarm/kernel-rockchip.git ksrc
+
+      - name: config + prepare
+        run: |
+          set -e
+          cp kernel/emb3582_android_defconfig ksrc/.config
+          ksrc/scripts/config --file ksrc/.config --module SND_SOC_ES8328 --module SND_SOC_ES8328_I2C
+          make -C ksrc ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+          make -C ksrc ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare -j$(nproc)
+          echo '--- symbols ---'
+          grep -E '^CONFIG_(MODVERSIONS|SND_SOC_ES8328|SND_SOC_ES8328_I2C|R8168)=' ksrc/.config
+
+      - name: build in-tree modules
+        run: |
+          set -e
+          mkdir -p out
+          make -C ksrc ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- M=sound/soc/codecs KBUILD_MODPOST_WARN=1 modules
+          make -C ksrc ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- M=drivers/net/ethernet/realtek KBUILD_MODPOST_WARN=1 modules
+          find ksrc/sound/soc/codecs -maxdepth 1 -name 'snd-soc-es8328*.ko' -exec cp {} out/ \;
+          find ksrc/drivers/net/ethernet/realtek -name 'r8168.ko' -exec cp {} out/ \;
+          ls -l out
+
+      - name: build rtl8188fu (USB wifi)
+        run: |
+          set -e
+          git clone https://github.com/kelebek333/rtl8188fu.git rtl8188fu
+          cd rtl8188fu
+          git checkout cefa9185df3e56d7208a8c147d0cf57b2440908f
+          make -C ../ksrc M=$PWD ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            CONFIG_PLATFORM_I386_PC=n CONFIG_MP_INCLUDED=n \
+            KBUILD_MODPOST_WARN=1 modules
+          cp 8188fu.ko ../out/
+
+      - name: inject __versions when missing
+        run: |
+          set -e
+          cd out
+          python3 -c "import struct; open('/tmp/ver.bin','wb').write(struct.pack('<Q',0)+b'_dummy'.ljust(64,b'\0'))"
+          for ko in *.ko; do
+            if aarch64-linux-gnu-readelf -SW "$ko" | grep -qw '__versions'; then
+              echo "$ko: has __versions"
+            else
+              aarch64-linux-gnu-objcopy \
+                --add-section __versions=/tmp/ver.bin \
+                --set-section-flags __versions=alloc,load,readonly "$ko"
+              echo "$ko: injected dummy __versions"
+            fi
+            echo "  vermagic: $(strings "$ko" | grep -m1 '^vermagic=')"
+            aarch64-linux-gnu-readelf -SW "$ko" | grep -w '__versions' || true
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emb3582-modules
+          path: out/*.ko
+          if-no-files-found: error
