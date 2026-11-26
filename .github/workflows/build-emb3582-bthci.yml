@@ -51,8 +51,14 @@ jobs:
         run: |
           set -e
           TOOL=ndk/toolchains/llvm/prebuilt/linux-x86_64/bin
+          echo '--- libbinder_ndk exports ---'
+          for api in 30 34; do
+            so=$TOOL/../sysroot/usr/lib/aarch64-linux-android/$api/libbinder_ndk.so
+            echo "api $api stub: $so"
+            "$TOOL/llvm-nm" -D "$so" 2>/dev/null | grep -E 'AServiceManager_addService|ABinderProcess_(set|join)' || true
+          done
           SRCS="bt-hal/main.cpp $(find gen -name '*.cpp' | tr '\n' ' ')"
-          "$TOOL/aarch64-linux-android30-clang++" -std=c++17 -O2 -fPIE -pie \
+          "$TOOL/aarch64-linux-android34-clang++" -std=c++17 -O2 -fPIE -pie \
             -static-libstdc++ -Wall -Wno-unused-parameter \
             -I gen -I gen/aidl -I bt-hal/aidl $SRCS \
             -o android.hardware.bluetooth-service.emb3582 \
