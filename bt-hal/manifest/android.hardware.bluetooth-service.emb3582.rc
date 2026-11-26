@@ -1,0 +1,6 @@
+service vendor-bt-hci-aidl /vendor/bin/hw/android.hardware.bluetooth-service.emb3582
+    class hal
+    user bluetooth
+    group bluetooth net_bt_admin net_admin net_raw
+    capabilities NET_ADMIN NET_RAW SYS_NICE
+    ioprio rt 4

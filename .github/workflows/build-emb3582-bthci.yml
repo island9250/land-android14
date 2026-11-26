@@ -1,0 +1,71 @@
+name: build-emb3582-bthci
+
+# Builds the AIDL android.hardware.bluetooth.IBluetoothHci HAL for the EMB-3582
+# Android image (stock image only ships the legacy HIDL 1.1 HAL).
+#
+# The service proxies the kernel HCI user channel of a USB controller, so it
+# works with btusb dongles (e.g. RTL8761BU, firmware already in /vendor).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [emb3582]
+    paths:
+      - '.github/workflows/build-emb3582-bthci.yml'
+      - 'bt-hal/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: deps
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends unzip curl file
+
+      - name: ndk + aidl compiler
+        run: |
+          set -e
+          curl -fsSL --retry 3 -o ndk.zip https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
+          unzip -q ndk.zip
+          mv android-ndk-r26d ndk
+          curl -fsSL --retry 3 -o bt.zip https://dl.google.com/android/repository/build-tools_r34-linux.zip
+          unzip -q bt.zip -d btools
+          AIDL=$(find btools -type f -name aidl | head -1)
+          chmod +x "$AIDL"
+          echo "AIDL=$PWD/$AIDL" >> "$GITHUB_ENV"
+
+      - name: aidl codegen (ndk backend, vintf stability)
+        run: |
+          set -e
+          mkdir -p gen
+          "$AIDL" --lang=ndk --stability=vintf -I bt-hal/aidl -o gen \
+            bt-hal/aidl/android/hardware/bluetooth/IBluetoothHci.aidl \
+            bt-hal/aidl/android/hardware/bluetooth/IBluetoothHciCallbacks.aidl \
+            bt-hal/aidl/android/hardware/bluetooth/Status.aidl
+          echo '--- generated ---'
+          find gen -type f
+
+      - name: build service
+        run: |
+          set -e
+          TOOL=ndk/toolchains/llvm/prebuilt/linux-x86_64/bin
+          SRCS="bt-hal/main.cpp $(find gen -name '*.cpp' | tr '\n' ' ')"
+          "$TOOL/aarch64-linux-android30-clang++" -std=c++17 -O2 -fPIE -pie \
+            -static-libstdc++ -Wall -Wno-unused-parameter \
+            -I gen -I bt-hal/aidl $SRCS \
+            -o android.hardware.bluetooth-service.emb3582 \
+            -lbinder_ndk -llog
+          "$TOOL/llvm-strip" --strip-unneeded android.hardware.bluetooth-service.emb3582
+          file android.hardware.bluetooth-service.emb3582
+          ls -l android.hardware.bluetooth-service.emb3582
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emb3582-bthci
+          path: |
+            android.hardware.bluetooth-service.emb3582
+            bt-hal/manifest/*.xml
+            bt-hal/manifest/*.rc
+          if-no-files-found: error
