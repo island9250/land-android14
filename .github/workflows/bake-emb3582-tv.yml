@@ -1,0 +1,52 @@
+name: bake-emb3582-tv
+
+# Experimental: bake FriendlyElec Android TV super slices with EMB3582 payload.
+# Input bundle is the prerelease asset tv-slices.tar.gz on emb3582-tv-v1.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [emb3582]
+    paths:
+      - '.github/workflows/bake-emb3582-tv.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download TV slices
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          cd work
+          gh release download emb3582-tv-v1 -R "$GITHUB_REPOSITORY" \
+            -p 'tv-slices.tar.gz' -p 'SHA256SUMS-tv.txt'
+          sha256sum -c SHA256SUMS-tv.txt
+          tar xzf tv-slices.tar.gz
+          rm -f tv-slices.tar.gz SHA256SUMS-tv.txt
+      - name: Install e2fsprogs
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends e2fsprogs
+      - name: Bake TV slices
+        run: |
+          set -o pipefail
+          cd work
+          sudo bash edit_tv_ext4.sh 2>&1 | tee edit.log
+      - name: Pack baked TV slices
+        run: |
+          set -euo pipefail
+          cd work
+          tar czf tv-baked-slices.tar.gz system.img system_ext.img vendor.img vendor_dlkm.img product.img edit.log
+          ls -lh tv-baked-slices.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emb3582-tv-baked
+          path: work/tv-baked-slices.tar.gz
+          if-no-files-found: error
+          retention-days: 7
