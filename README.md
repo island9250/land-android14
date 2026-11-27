@@ -1,11 +1,25 @@
-# h88k-android14 — HINLINK H88K（RK3588）Android 14 适配
+# land-android14 — RK3588 Android 14 适配与线刷包
+
+## EMB3582 最终整包 v1.0.0
+
+面向 NORCO-EMB3582 的 Android 14 eMMC 整包，已真机验证。
+
+- Release：[v1.0.0](https://github.com/island9250/land-android14/releases/tag/v1.0.0)
+- 下载：`update-emb3582-final.tar.gz`（1,074,790,668 B）
+- 解压后：`update-emb3582-final.img`（3,929,643,594 B，SHA256 `4685e6ffda1f5f2db9d0015567ede1a9b00ece3c2176354796e5e1480f17f7b1`）
+- 已固化：NORCO-EMB3582 品牌、中文、rtl8188fu WiFi、r8168、ES8328、蓝牙 HAL/manifest、风扇、firstboot；不依赖 overlay。
+- 刷机与回滚：[docs/EMB3582-USB线刷与回滚.md](docs/EMB3582-USB线刷与回滚.md)
+- CI 打包与复现：[docs/EMB3582-CI打包与复现.md](docs/EMB3582-CI打包与复现.md)
+- 自动构建：`.github/workflows/build-emb3582-final.yml`（debugfs 烘焙 super → afptool/rkImageMaker → tar.gz → artifact/Release）
+
+## HINLINK H88K（RK3588）Android 14 适配
 
 用友善（FriendlyElec）`rk35xx-android14` 的 RK3588 Android 14 镜像做底，
 把板级设备树换成 H88K 的，其余全部保持官方原样。
 
 > 目标板：**HINLINK H88K V3**（`compatible = "hlink,h88k"`，RK3588 / 8GB / 64GB eMMC / NVMe 931G）
 
-## 现状
+### 现状
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|

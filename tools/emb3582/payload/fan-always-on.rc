@@ -1,0 +1,5 @@
+# EMB-3582: the board's fan is a plain on/off load on reg_fan (GPIO2_B6).
+# The stock DTB makes pwm-fan fail probe on a pin conflict with vcc5v0-host,
+# so nothing enables the regulator. Keep the fan powered after boot.
+on post-fs-data
+    write /sys/kernel/debug/regulator/reg_fan/enable 1

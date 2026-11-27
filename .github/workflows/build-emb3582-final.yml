@@ -1,0 +1,148 @@
+name: build-emb3582-final
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to create or update
+        required: true
+        default: v1.0.0
+      publish_release:
+        description: Publish the compressed package to GitHub Release
+        type: boolean
+        default: false
+      base_tag:
+        description: Release tag containing super-base.tar.gz and base-parts.tar.gz
+        required: true
+        default: emb3582-base-v1
+  push:
+    branches: [emb3582]
+    paths:
+      - '.github/workflows/build-emb3582-final.yml'
+      - 'tools/emb3582/**'
+      - 'docs/EMB3582-*.md'
+
+permissions:
+  contents: write
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download stock super
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_TAG: ${{ inputs.base_tag || 'emb3582-base-v1' }}
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          cd work
+          gh release download "$BASE_TAG" -R "$GITHUB_REPOSITORY" \
+            -p 'super-base.tar.gz' -p 'SHA256SUMS-base.txt'
+          sha256sum -c SHA256SUMS-base.txt
+          tar xzf super-base.tar.gz
+          rm -f super-base.tar.gz SHA256SUMS-base.txt
+      - name: Prepare and bake six slices
+        run: |
+          set -euo pipefail
+          node tools/emb3582/prepare_slices.mjs work/super.img work/slices
+          cp tools/emb3582/edit_ext4.sh work/slices/
+          cp -a tools/emb3582/payload work/slices/
+          cd work/slices
+          sudo bash edit_ext4.sh 2>&1 | tee edit.log
+      - name: Splice and verify super
+        run: |
+          set -euo pipefail
+          node tools/emb3582/splice_super.mjs work/super.img work/slices work/super-emb3582.img
+          node tools/emb3582/verify_super.mjs work/super-emb3582.img work/slices
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emb3582-super-baked
+          path: work/super-emb3582.img
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    needs: bake
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download base partitions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_TAG: ${{ inputs.base_tag || 'emb3582-base-v1' }}
+        run: |
+          set -euo pipefail
+          mkdir -p base pkg work
+          cd base
+          gh release download "$BASE_TAG" -R "$GITHUB_REPOSITORY" \
+            -p 'base-parts.tar.gz' -p 'SHA256SUMS-base-parts.txt'
+          sha256sum -c SHA256SUMS-base-parts.txt
+          tar xzf base-parts.tar.gz -C ../pkg
+          rm -f base-parts.tar.gz SHA256SUMS-base-parts.txt
+      - name: Download baked super
+        uses: actions/download-artifact@v4
+        with:
+          name: emb3582-super-baked
+          path: work
+      - name: Verify package inputs
+        run: |
+          set -euo pipefail
+          mv work/super-emb3582.img pkg/super.img
+          node tools/emb3582/verify_package.mjs pkg
+      - name: Build RKAF/RKFW update image
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/rktools
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/rockchip-toybrick/RKTools.git /tmp/rktools
+          git -C /tmp/rktools sparse-checkout set linux/Linux_Pack_Firmware/rockdev
+          TOOLS=/tmp/rktools/linux/Linux_Pack_Firmware/rockdev
+          chmod +x "$TOOLS/afptool" "$TOOLS/rkImageMaker"
+          "$TOOLS/afptool" -pack pkg update.raw.img
+          cp pkg/MiniLoaderAll.bin MiniLoaderAll.bin
+          rm -rf pkg base work
+          "$TOOLS/rkImageMaker" -RK3588 MiniLoaderAll.bin update.raw.img \
+            update-emb3582-final.img -os_type:androidos
+          rm -f update.raw.img MiniLoaderAll.bin
+          test "$(stat -c %s update-emb3582-final.img)" -gt 3900000000
+      - name: Compress and hash
+        run: |
+          set -euo pipefail
+          tar czf update-emb3582-final.tar.gz update-emb3582-final.img
+          sha256sum update-emb3582-final.img update-emb3582-final.tar.gz > SHA256SUMS.txt
+          ls -lh update-emb3582-final.img update-emb3582-final.tar.gz SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emb3582-final
+          path: |
+            update-emb3582-final.tar.gz
+            SHA256SUMS.txt
+            docs/EMB3582-USB线刷与回滚.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+              update-emb3582-final.tar.gz SHA256SUMS.txt docs/EMB3582-USB线刷与回滚.md --clobber
+          else
+            gh release create "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+              update-emb3582-final.tar.gz SHA256SUMS.txt docs/EMB3582-USB线刷与回滚.md \
+              --title "EMB3582 Android 14 final package $RELEASE_TAG" \
+              --notes-file docs/EMB3582-Release说明.md
+          fi

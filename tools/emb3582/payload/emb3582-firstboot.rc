@@ -1,0 +1,6 @@
+# EMB-3582: apply first-boot defaults once userdata exists.
+# seclabel is required: a temp exec service with an empty label is rejected by
+# init because init has no domain transition to shell_exec. Running as the
+# shell domain/uid is equivalent to "adb shell" and may write global settings.
+on property:sys.boot_completed=1
+    exec u:r:shell:s0 shell shell -- /system/bin/sh /vendor/etc/emb3582-firstboot.sh

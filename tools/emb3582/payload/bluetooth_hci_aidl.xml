@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AIDL Bluetooth HCI HAL provided by the EMB-3582 AIDL proxy service.
+     The stock image only declares the legacy HIDL 1.1 HAL, which Android 14's
+     Bluetooth stack no longer uses. -->
+<manifest version="1.0" type="device">
+    <hal format="aidl">
+        <name>android.hardware.bluetooth</name>
+        <fqname>IBluetoothHci/default</fqname>
+    </hal>
+</manifest>

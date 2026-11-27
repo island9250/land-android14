@@ -1,0 +1,20 @@
+# NAME	path
+package-file	package-file
+bootloader	MiniLoaderAll.bin
+parameter	parameter.txt
+security	security.img
+uboot_a	uboot.img
+uboot_b	uboot.img
+misc	misc.img
+dtbo_a	dtbo.img
+dtbo_b	dtbo.img
+vbmeta_a	vbmeta.img
+vbmeta_b	vbmeta.img
+boot_a	boot.img
+boot_b	boot.img
+backup	backup.img
+cache	cache.img
+metadata	metadata.img
+frp	frp.img
+baseparameter	baseparameter.img
+super	super.img
