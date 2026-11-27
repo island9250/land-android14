@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""One-shot: stock FriendlyElec Android 14 boot.img -> H88K boot.img.
+"""One-shot: stock FriendlyElec Android 14 boot.img -> EMB3582 boot.img.
 
 Does three things in a single RSCE rebuild (so the image is only written once):
 
-    1. every `rk3588-nanopi6-rev*.dtb` slot  <- our H88K dtb
+    1. every `rk3588-nanopi6-rev*.dtb` slot  <- our EMB3582 dtb
        (the stock boot.img carries 12 of them, rev01..rev0c; hwrev probing on a
        non-FriendlyElec board is unpredictable, so all of them must be filled)
-    2. logo.bmp / logo_kernel.bmp           <- H88K artwork
+    2. logo.bmp / logo_kernel.bmp           <- board artwork (optional)
     3. second_size + Rockchip boot id SHA1  <- recomputed
 
 Refuses to write a boot.img that does not fit the `boot_a` partition, because an
 oversized image flashes fine and then fails to load with no useful message.
 
 Usage:
-    python pack_boot.py --stock boot.img --dtb rk3588-hlink-h88k.dtb \
-        --logo logos/h88k-lockup-512x128.bmp -o out/boot.img
+    python pack_boot.py --stock boot.img --dtb dts/rk3588-emb3582-android.dts \
+        -o out/boot-emb3582.img
 """
 import argparse
 import fnmatch
@@ -39,7 +39,7 @@ def bmp_info(blob):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--stock", required=True)
-    ap.add_argument("--dtb", required=True, help="H88K dtb; fills every rk3588 slot")
+    ap.add_argument("--dtb", required=True, help="EMB3582 dtb; fills every rk3588 slot")
     ap.add_argument("--dtb-pattern", default="rk3588-nanopi6-rev*.dtb")
     ap.add_argument("--logo")
     ap.add_argument("--kernel-logo")

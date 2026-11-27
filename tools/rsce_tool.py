@@ -157,8 +157,8 @@ def boot_replace(boot, pattern, dtb, fill_range=None):
     # RSCE keeps its own 512-byte granularity (stock images are 512-multiples)
     new_second += b"\0" * ((-len(new_second)) % HDR)
     pad = (-len(new_second)) % page
-    # v2 header may carry a separate dtb segment after `second` (the vendor H88K
-    # Android 12 boot.img does: dtb_size=252757). Dropping it breaks the SHA1 and
+    # v2 header may carry a separate dtb segment after `second` (the vendor
+    # Android 14 boot.img does: dtb_size=252757). Dropping it breaks the SHA1 and
     # the boot. Keep whatever follows, byte for byte.
     tail = boot[off + ((ssize + page - 1) // page) * page:]
     head = bytearray(boot[:off])

@@ -1,24 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""把友善 Android 14 的「分区镜像包」拼成一张能写进 SD 卡的整盘 .img。
+"""把友善 Android 14 的「分区镜像包」拼成 EMB3582 的 SD 卡整盘 .img。
 
-为什么要自己拼：
-    静 package（android-14-images-rk3588.tgz）里是一堆分区镜像 + parameter.txt，
-    配 upgrade_tool 线刷 eMMC 用的。H88K 的 eMMC 上装着 U-Boot（它负责引导 NVMe
-    上的 fnOS），线刷会把那套东西铲掉，fnOS 就起不来了。
-    走 SD 卡则完全不碰 eMMC：卡上有自己的 idbloader + uboot_a，Rockchip BootROM
-    扫到卡就优先从卡启动。
+写 SD 卡不碰 eMMC：卡上有自己的 idbloader + uboot_a，Rockchip BootROM
+扫到卡就优先从卡启动。
 
 做的事：
     1. 按 parameter.txt 的 mtdparts 生成 GPT（分区名 = 括号里的名字）
     2. idbloader.img 写到 LBA 64（Rockchip 固定的 loader 偏移）
-    3. 各分区镜像按 start_lba 落位；boot_a/boot_b 用我们改过的 H88K boot.img
+    3. 各分区镜像按 start_lba 落位；boot_a/boot_b 用改过的 EMB3582 boot.img
     4. userdata 留空白（Android 首次启动自己 mkfs）
     5. 全程稀疏写入，写完回读校验每个分区的首尾 4KB
 
 用法：
-    python make_sd_image.py --size-gb 8 -o out/h88k-a14-sd.img
-    python make_sd_image.py --size-gb 8 --boot build/boot-rk3588-h88k-a14.img -o ...
+    python make_sd_image.py --size-gb 8 -o out/emb3582-a14-sd.img
+    python make_sd_image.py --size-gb 8 --boot build/boot-emb3582.img -o ...
 """
 import argparse
 import os
@@ -175,7 +171,7 @@ def write_sparse_at(f_out, off, path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--size-gb", type=float, default=8.0)
-    ap.add_argument("--boot", default=os.path.join(REPO, "build", "boot-rk3588-h88k-a14.img"))
+    ap.add_argument("--boot", default=os.path.join(REPO, "build", "boot-emb3582.img"))
     ap.add_argument("--param", default=os.path.join(IMG_DIR, "parameter.txt"))
     ap.add_argument("--img-dir", default=IMG_DIR)
     ap.add_argument("--userdata-gb", type=float, default=0,

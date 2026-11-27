@@ -7,8 +7,7 @@ name: build-emb3582-sd
 #       Android 化 dtb；uboot/分区布局保持友善原样。
 # 产物：emb3582-a14-sd-8g.img.xz，写 SD 卡整盘启动，不碰 eMMC/NVMe。
 #
-# 和 H88K 的 build-h88k-usb.yml 共用同一套 dtb/cpp/pack_boot/make_sd_image 工具；
-# 区别是不打 USB 线刷包，直接出 SD 整盘镜像。
+# 使用仓库内通用 pack_boot/make_sd_image 工具，不打 USB 线刷包，直接出 SD 整盘镜像。
 
 on:
   workflow_dispatch:

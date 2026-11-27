@@ -2,6 +2,7 @@
 
 ## 刷机前
 
+- **常规刷机不需要擦除 Flash，也不需要点「擦除所有」**。完整包已包含 parameter、misc 和 GPT 所需内容。
 - 备份 eMMC；整包会覆盖 `misc/vbmeta/boot/super` 等分区。
 - 确认板子进入 Rockusb loader：Windows 设备管理器应显示 `2207:350B Rockusb Device`。
 - TTL 为 COM3 / 1500000；loader 状态下通常只循环打印等待符 `-\|/`，没有 U-Boot 横幅，属正常。
@@ -14,6 +15,17 @@
 3. 点「升级」，等待日志出现「下载固件成功」。
 4. 工具会自动复位。若仍停在 loader，用「高级功能 → 重启设备」；本包 uboot 为原厂 env，实测该操作可正常回到系统。
 5. 系统启动后确认 adb `2207:0006` 或 MTP `2207:0007`。
+
+### 刷机后无法启动：先擦除，再重刷
+
+如果刷机后无法正常启动（例如一直停在 loader、`No bootable slots`、反复重启），按以下顺序处理：
+
+1. 重新进入 Maskrom 或 LOADER。
+2. 若处于 Maskrom，用「高级功能 → Boot」选择 `MiniLoaderAll.bin` →「下载」，让设备回到 LOADER。
+3. 在「高级功能」点「擦除所有」。**此操作会清空 GPT 和全部分区，数据不可恢复。**
+4. 回到「升级固件」，重新刷完整的 `update-emb3582-final.img`；完整包会重建 parameter、misc 和 GPT。
+
+常规首次刷机仍不需要预先擦除；只有刷后异常时才采用上面的“先擦除、后重刷”排障流程。
 
 ## 刷后检查
 

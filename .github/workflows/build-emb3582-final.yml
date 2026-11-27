@@ -20,7 +20,6 @@ on:
     paths:
       - '.github/workflows/build-emb3582-final.yml'
       - 'tools/emb3582/**'
-      - 'docs/EMB3582-*.md'
 
 permissions:
   contents: write

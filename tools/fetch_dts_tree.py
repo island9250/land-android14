@@ -28,7 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 OUT = os.path.join(REPO, "vendor", "dts-tree")
 DTS_DIR = "arch/arm64/boot/dts/rockchip"
-SEED_LOCAL = os.path.join(REPO, "dts", "rk3588-hlink-h88k-android.dts")
+SEED_LOCAL = os.path.join(REPO, "dts", "rk3588-emb3582-android.dts")
 
 INC_RE = re.compile(rb'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.M)
 
@@ -73,7 +73,7 @@ def fetch(rel, depth=0, retries=3):
             break
         url = BASE + rel
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "h88k-dtb-fetch/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "emb3582-dtb-fetch/1.0"})
             with urllib.request.urlopen(req, timeout=90) as r:
                 data = r.read()
             break
