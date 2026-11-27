@@ -39,7 +39,19 @@ jobs:
           patch = 'rm -f /tmp/vd/lib/modules/rtl8812au.ko /tmp/vd/lib/modules/rtl8851bu.ko\n'
           if patch not in s:
               s = s.replace(needle, patch + needle)
-          p.write_text(s)
+          s = s.replace(
+              '    local img=$1 path=$2 mode=$3 tmp=/tmp/$(basename "$path").$$\n',
+              '    local img=$1 path=$2 mode=$3\n    local tmp="/tmp/$(basename "$path").$$"\n')
+          s = s.replace('S=system.img\n', 'S=system.img\nSYS_PROP=/system/build.prop\nhas_file "$S" "$SYS_PROP" || SYS_PROP=/build.prop\n', 1)
+          before, rest = s.split('S=system.img\n', 1)
+          rest = rest.replace('rewrite_prop "$S" /build.prop 0100644', 'rewrite_prop "$S" "$SYS_PROP" 0100644')
+          rest = rest.replace('if has_file "$S" /build.prop; then', 'if has_file "$S" "$SYS_PROP"; then')
+          rest = rest.replace('debugfs -R "dump /build.prop /tmp/system.build.prop" "$S"', 'debugfs -R "dump $SYS_PROP /tmp/system.build.prop" "$S"')
+          rest = rest.replace('debugfs -w -R "rm /build.prop" "$S"', 'debugfs -w -R "rm $SYS_PROP" "$S"')
+          rest = rest.replace('debugfs -w -R "write /tmp/system.build.prop /build.prop" "$S"', 'debugfs -w -R "write /tmp/system.build.prop $SYS_PROP" "$S"')
+          rest = rest.replace('debugfs -w -R "sif /build.prop mode 0100644" "$S"', 'debugfs -w -R "sif $SYS_PROP mode 0100644" "$S"')
+          rest = rest.replace('debugfs -R "dump /build.prop /tmp/s2.prop" system.img', 'debugfs -R "dump $SYS_PROP /tmp/s2.prop" system.img')
+          p.write_text(before + 'S=system.img\n' + rest)
           PY
 
       - name: edit slices
@@ -50,7 +62,7 @@ jobs:
       - name: pack results
         run: |
           set -e
-          tar czf results.tar.gz vendor.img vendor_dlkm.img system.img system_ext.img odm.img product.img edit.log
+          tar czf results.tar.gz system.img edit.log
           ls -l results.tar.gz
 
       - uses: actions/upload-artifact@v4
@@ -58,3 +70,8 @@ jobs:
           name: baked-slices
           path: results.tar.gz
           if-no-files-found: error
+
+      - name: publish release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload bake-bundle-v1 results.tar.gz -R "$GITHUB_REPOSITORY" --clobber
