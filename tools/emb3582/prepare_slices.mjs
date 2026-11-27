@@ -19,6 +19,12 @@ for (const [name, { offset, size }] of Object.entries(layout)) {
   }
   fs.fsyncSync(outFd);
   fs.closeSync(outFd);
+  const dst = path.join(outDir, name + '.img');
+  const checkFd = fs.openSync(dst, 'r');
+  const magic = Buffer.alloc(2);
+  fs.readSync(checkFd, magic, 0, 2, 0x438);
+  fs.closeSync(checkFd);
+  if (magic.readUInt16LE(0) !== 0xef53) throw new Error(`${name}: not an ext4 slice at 0x${offset.toString(16)}`);
   console.log(`prepared ${name} @0x${offset.toString(16)} ${size}`);
 }
 fs.closeSync(inFd);

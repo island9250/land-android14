@@ -1,8 +1,8 @@
 {
   "system": { "offset": 1048576, "size": 1153925120 },
-  "system_ext": { "offset": 1174405120, "size": 200450048 },
-  "vendor": { "offset": 1358954496, "size": 371466240 },
-  "vendor_dlkm": { "offset": 1732026368, "size": 28577792 },
-  "odm": { "offset": 1761607680, "size": 831488 },
-  "product": { "offset": 1762446848, "size": 507117568 }
+  "system_ext": { "offset": 1156579328, "size": 200450048 },
+  "vendor": { "offset": 1357905920, "size": 371466240 },
+  "vendor_dlkm": { "offset": 1730150400, "size": 28577792 },
+  "odm": { "offset": 1759510528, "size": 831488 },
+  "product": { "offset": 1761607680, "size": 507117568 }
 }
