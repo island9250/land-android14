@@ -1,0 +1,49 @@
+name: bake-emb3582-tv-v2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [emb3582]
+    paths:
+      - '.github/workflows/bake-emb3582-tv-v2.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download v2 system slice
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          cd work
+          gh release download emb3582-tv-v2 -R "$GITHUB_REPOSITORY" \
+            -p 'tv-system-v2.tar.gz' -p 'SHA256SUMS-tv-v2.txt'
+          sha256sum -c SHA256SUMS-tv-v2.txt
+          tar xzf tv-system-v2.tar.gz
+          rm -f tv-system-v2.tar.gz SHA256SUMS-tv-v2.txt
+      - name: Install e2fsprogs
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends e2fsprogs
+      - name: Bake v2 system defaults
+        run: |
+          set -o pipefail
+          cd work
+          sudo bash edit_system_v2.sh 2>&1 | tee edit.log
+      - name: Pack v2 system slice
+        run: |
+          set -euo pipefail
+          cd work
+          tar czf tv-system-v2-baked.tar.gz system.img edit.log
+          ls -lh tv-system-v2-baked.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emb3582-tv-system-v2
+          path: work/tv-system-v2-baked.tar.gz
+          if-no-files-found: error
+          retention-days: 7
