@@ -6,7 +6,8 @@
 
 - `super-base.tar.gz`：原厂 `super.img`，约 3.35 GB。
 - `base-parts.tar.gz`：MiniLoader、parameter、boot/dtbo/vbmeta/misc、backup/cache/metadata/frp/baseparameter/security、原厂 env uboot 和 `package-file`。
-- `SHA256SUMS-base.txt` / `SHA256SUMS-base-parts.txt`：对应压缩包校验。
+- `rktools-win.tar.gz`：AFPTool.exe、RKImageMaker.exe 及运行库（Windows 组包 job 使用）。
+- `SHA256SUMS-base.txt` / `SHA256SUMS-base-parts.txt` / `SHA256SUMS-rktools.txt`：对应压缩包校验。
 
 大镜像不进入 git；仓库只保存烘焙脚本、payload、分区布局和校验器。
 
@@ -16,7 +17,7 @@
 
 ```text
 下载 super-base → 切 6 片 → debugfs 离线烘焙 → 拼回 super → SHA256 回读
-→ 下载 base-parts + baked super → afptool → rkImageMaker
+→ 下载 base-parts + baked super → Windows AFPTool/RKImageMaker
 → 源包校验 → tar.gz → SHA256SUMS → artifact / Release
 ```
 
@@ -43,11 +44,11 @@ node tools/emb3582/verify_package.mjs pkg
 
 `pkg/` 由 `base-parts.tar.gz` 解压，并把 `super-emb3582.img` 改名为 `pkg/super.img`。
 
-RKTools 使用 `rockchip-toybrick/RKTools` 的 Linux 版 `afptool` / `rkImageMaker`：
+组包使用随基础资产下载的 Windows 版工具（Linux 版处理 3.35 GB super 时段错误）：
 
-```bash
-afptool -pack pkg update.raw.img
-rkImageMaker -RK3588 pkg/MiniLoaderAll.bin update.raw.img update.img -os_type:androidos
+```powershell
+./rktools/AFPTool.exe -pack pkg update.raw.img
+./rktools/RKImageMaker.exe -RK3588 pkg/MiniLoaderAll.bin update.raw.img update.img -os_type:androidos
 ```
 
 ## 关键约束

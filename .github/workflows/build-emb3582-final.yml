@@ -69,8 +69,11 @@ jobs:
 
   package:
     needs: bake
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -89,6 +92,19 @@ jobs:
           sha256sum -c SHA256SUMS-base-parts.txt
           tar xzf base-parts.tar.gz -C ../pkg
           rm -f base-parts.tar.gz SHA256SUMS-base-parts.txt
+      - name: Download Windows packer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_TAG: ${{ inputs.base_tag || 'emb3582-base-v1' }}
+        run: |
+          set -euo pipefail
+          gh release download "$BASE_TAG" -R "$GITHUB_REPOSITORY" \
+            -p 'rktools-win.tar.gz' -p 'SHA256SUMS-rktools.txt'
+          sha256sum -c SHA256SUMS-rktools.txt
+          mkdir -p rktools
+          tar xzf rktools-win.tar.gz -C rktools
+          rm -f rktools-win.tar.gz SHA256SUMS-rktools.txt
       - name: Download baked super
         uses: actions/download-artifact@v4
         with:
@@ -100,21 +116,19 @@ jobs:
           mv work/super-emb3582.img pkg/super.img
           node tools/emb3582/verify_package.mjs pkg
       - name: Build RKAF/RKFW update image
+        shell: pwsh
         run: |
-          set -euo pipefail
-          rm -rf /tmp/rktools
-          git clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/rockchip-toybrick/RKTools.git /tmp/rktools
-          git -C /tmp/rktools sparse-checkout set linux/Linux_Pack_Firmware/rockdev
-          TOOLS=/tmp/rktools/linux/Linux_Pack_Firmware/rockdev
-          chmod +x "$TOOLS/afptool" "$TOOLS/rkImageMaker"
-          "$TOOLS/afptool" -pack pkg update.raw.img
-          cp pkg/MiniLoaderAll.bin MiniLoaderAll.bin
-          rm -rf pkg base work
-          "$TOOLS/rkImageMaker" -RK3588 MiniLoaderAll.bin update.raw.img \
-            update-emb3582-final.img -os_type:androidos
-          rm -f update.raw.img MiniLoaderAll.bin
-          test "$(stat -c %s update-emb3582-final.img)" -gt 3900000000
+          $ErrorActionPreference = 'Stop'
+          & ./rktools/AFPTool.exe -pack pkg update.raw.img
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item pkg/MiniLoaderAll.bin MiniLoaderAll.bin
+          Remove-Item -Recurse -Force pkg, base, work
+          & ./rktools/RKImageMaker.exe -RK3588 MiniLoaderAll.bin update.raw.img update-emb3582-final.img -os_type:androidos
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item -Force update.raw.img, MiniLoaderAll.bin
+          if ((Get-Item update-emb3582-final.img).Length -le 3900000000) {
+            throw 'update image is too small'
+          }
       - name: Compress and hash
         run: |
           set -euo pipefail
