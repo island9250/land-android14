@@ -30,12 +30,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends e2fsprogs
 
       - name: edit slices
-        run: bash edit_ext4.sh 2>&1 | tee edit.log
+        run: |
+          set -o pipefail
+          bash edit_ext4.sh 2>&1 | tee edit.log
 
       - name: pack results
         run: |
           set -e
-          tar czf results.tar.gz vendor.img vendor_dlkm.img product.img edit.log
+          tar czf results.tar.gz vendor.img vendor_dlkm.img system.img system_ext.img odm.img product.img edit.log
           ls -l results.tar.gz
 
       - uses: actions/upload-artifact@v4
