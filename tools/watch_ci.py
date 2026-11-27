@@ -7,14 +7,19 @@ import sys
 import time
 import urllib.request
 
-REPO = "linyueweia/ha-android14"
-WORKFLOW = os.environ.get("WF", "dtb-build.yml")
+REPO = os.environ.get("GITHUB_REPOSITORY", "island9250/land-android14")
+WORKFLOW = os.environ.get("WF", "build-emb3582-final.yml")
 
 
-ENV_PATH = os.environ.get("HERMES_ENV", r"D:\Hermes\hermes_data\.env")
+ENV_PATH = os.environ.get("HERMES_ENV")
 
 
 def token():
+    tok = os.environ.get("GITHUB_TOKEN")
+    if tok:
+        return tok
+    if not ENV_PATH:
+        raise SystemExit("set GITHUB_TOKEN or HERMES_ENV")
     with open(ENV_PATH, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
             if line.startswith("GITHUB_TOKEN="):
