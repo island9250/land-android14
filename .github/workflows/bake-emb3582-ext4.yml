@@ -29,10 +29,23 @@ jobs:
       - name: deps
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends e2fsprogs
 
+      - name: patch edit script
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('edit_ext4.sh')
+          s = p.read_text()
+          needle = 'for m in rtl8188fu snd-soc-es8328 snd-soc-es8328-i2c r8168; do\n'
+          patch = 'rm -f /tmp/vd/lib/modules/rtl8812au.ko /tmp/vd/lib/modules/rtl8851bu.ko\n'
+          if patch not in s:
+              s = s.replace(needle, patch + needle)
+          p.write_text(s)
+          PY
+
       - name: edit slices
         run: |
           set -o pipefail
-          bash edit_ext4.sh 2>&1 | tee edit.log
+          sudo bash edit_ext4.sh 2>&1 | tee edit.log
 
       - name: pack results
         run: |
