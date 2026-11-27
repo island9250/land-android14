@@ -8,7 +8,7 @@ on:
       - '.github/workflows/bake-emb3582-tv-v3.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   bake:
@@ -41,6 +41,10 @@ jobs:
           cd work
           tar czf tv-v3-baked.tar.gz system.img vendor.img edit.log
           ls -lh tv-v3-baked.tar.gz
+      - name: Publish release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload emb3582-tv-v3 work/tv-v3-baked.tar.gz -R "$GITHUB_REPOSITORY" --clobber
       - uses: actions/upload-artifact@v4
         with:
           name: emb3582-tv-v3-baked
